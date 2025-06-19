@@ -1,0 +1,26 @@
+# FRAME: Git Ignore
+
+# Deno
+deno.lock
+.deno/
+*.tsbuildinfo
+
+# Runtime data
+data/
+*.jsonl
+*.bak
+*.tmp
+*.log
+*.out
+test_complete_features.ts
+
+# Editor + environment
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.env*
+docker-compose*
+*.local

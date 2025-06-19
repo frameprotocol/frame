@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.unstable"],
+    "strict": true
+  },
+  "imports": {
+    "@noble/curves/ed25519": "https://esm.sh/@noble/curves@1.2.0/ed25519",
+    "@noble/curves/scalar": "https://esm.sh/@noble/curves@1.2.0/scalar",
+    "@noble/hashes/utils": "https://esm.sh/@noble/hashes@1.3.3/utils"
+  },
+  "tasks": {
+    "start": "deno run --allow-read --allow-write frame.ts"
+  }
+} 
