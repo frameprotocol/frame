@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRAME Test</title>
+</head>
+<body>
+  <h1>FRAME Core Test</h1>
+  <div id="output"></div>
+  
+  <script type="module">
+    import frame from './src/frame.js';
+    
+    const output = document.getElementById('output');
+    
+    async function test() {
+      try {
+        output.innerHTML = '<p>Testing FRAME core functionality...</p>';
+        
+        // Test identity creation
+        const identity = await frame.createIdentity('testuser');
+        output.innerHTML += `<p>✅ Created identity: ${identity}</p>`;
+        
+        // Test capability granting
+        const capability = await frame.grantCapability(identity, identity, 'test.action');
+        output.innerHTML += `<p>✅ Granted capability: ${capability.action}</p>`;
+        
+        // Test intent submission
+        const intentId = await frame.submitIntent('test.action?param=value', true);
+        output.innerHTML += `<p>✅ Submitted and executed intent: ${intentId}</p>`;
+        
+        // Test getting data
+        const identities = await frame.getIdentities();
+        const capabilities = await frame.getCapabilities();
+        const intents = await frame.getIntents();
+        
+        output.innerHTML += `<p>✅ Found ${identities.length} identities</p>`;
+        output.innerHTML += `<p>✅ Found ${capabilities.length} capabilities</p>`;
+        output.innerHTML += `<p>✅ Found ${intents.length} intents</p>`;
+        
+        output.innerHTML += '<p><strong>🎉 All tests passed! FRAME is working correctly.</strong></p>';
+        
+      } catch (error) {
+        output.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+        console.error('Test error:', error);
+      }
+    }
+    
+    test();
+  </script>
+</body>
+</html> 

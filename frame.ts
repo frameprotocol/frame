@@ -20,7 +20,13 @@ const [major, minor] = Deno.version.deno.split(".").map(Number);
 if (major < 1 || (major === 1 && minor < 32)) {
   console.warn(`⚠️  FRAME requires Deno v1.32+ — you are on ${Deno.version.deno}`);
 }
+function printHelp() {
+  console.log(`\nFRAME CLI — Sovereign Agent OS\n\nUsage: frame <command> [options]\n\nIDENTITY & TRUST\n  frame create <name>                    Create identity\n  frame fork <parent> <child>            Fork identity\n  frame merge <from> into <target>       Merge identities\n  frame trust <from> --trusts <to>       Set trust relationship\n  frame claim @<handle> --as <identity>  Claim a handle\n  frame whois @<handle>                  Lookup handle owner\n\nCAPABILITIES\n  frame grant <issuer> <action> <grantee> [--expires <ISODate>]  Grant capability (positional)\n  frame grant <action> --to <recipient> [--expires <ISODate>]    Grant capability (flag)\n  frame revoke <issuer> <action> <grantee>                       Revoke capability (positional)\n  frame revoke <action> --from <identity>                        Revoke capability (flag)\n  frame cap list                                                 List all capabilities\n  frame cap audit                                                Audit capabilities\n  frame cap purge-invalid                                        Remove invalid capabilities\n  frame caps <identity>                                          List capabilities for identity\n  frame capabilities <identity>                                  Alias for caps\n\nTOKENS\n  frame mint <identity> <amount>         Mint tokens\n  frame transfer <from> <to> <amount>    Transfer tokens\n  frame balance <identity>               Check token balance\n\nINTENTS\n  frame intent <intent-url> [--exec] [--anchor]  Resolve/execute intent\n  frame send-intent <identity> <intent>          Send intent\n  frame submit <intent-url>                      Submit intent for agent\n\nAGENTS & REFLEX\n  frame agent <identity> [options]       Run autonomous agent\n  frame reflex add <agent> <condition> <action>  Add reflex rule\n  frame reflex list <agent>              List reflex rules\n  frame reflex stats <agent>             Show reflex stats\n  frame reflex check <agent>             Manually check reflex\n\nCHAIN & EXPLORER\n  frame chain verify                     Verify hashchain\n  frame chain show                       Show all blocks\n  frame chain wipe                       Wipe the blockchain\n  frame explorer [port]                  Start web explorer\n\nPEERS & STAKING\n  frame peers list                       List known peers\n  frame peers add <url> <trustScore>     Add peer\n  frame trust-peer <peer-url> <score>    Update peer trust\n  frame peer-stats                       Show peer stats\n  frame stake define <cap> <amt> <lockMs> <desc>  Define staking\n  frame stake grant <issuer> <grantee> <cap>      Stake tokens\n  frame stake unlock <stakeId>           Unlock a stake\n  frame stake list <user>                List all stakes\n  frame stake stats                      Show staking stats\n\nLOGS & REPAIR\n  frame log <identity>                   Show log for identity\n  frame repair-identities                Repair identity data\n  frame repair-caps                      Repair capability data\n\nWEB UI\n  frame serve [port]                     Start web-lite UI\n\nFLAGS\n  --kv         Use Deno KV for persistent storage\n  --unstable   Required for Deno KV\n\nEXAMPLES\n  frame create alice --kv\n  frame grant alice mint.frame bob --kv\n  frame cap list --kv\n  frame mint alice 100 --kv\n  frame send-intent alice "pay.gas?amount=25" --kv\n  frame reflex add alice "balance < 100" "mint.self?amount=200" --kv\n  frame serve 8080\n\nFor more info, see README.md\n`);
+}
 switch (command) {
+  case "help":
+    printHelp();
+    Deno.exit(0);
   case "create":
     const name = args[0];
     if (!name) {
@@ -119,27 +125,41 @@ switch (command) {
     break;
   }
   case "grant": {
-    const action = args[0];
-    const toFlag = args[1];
-    const recipient = args[2];
-    let expires_at: string | null = null;
-    if (args[3] === "--expires" && args[4]) {
-      expires_at = args[4];
-    }
-    if (!action || toFlag !== "--to" || !recipient) {
-      console.error("Usage: frame grant <action> --to <recipient> [--expires <ISODate>]");
+    let issuer, action, grantee, expires_at = null;
+    if (args.length >= 3 && args[1] && args[2] && !args[0].startsWith("--") && !args[1].startsWith("--") && !args[2].startsWith("--")) {
+      [issuer, action, grantee] = args;
+      const expiresIdx = args.indexOf("--expires");
+      if (expiresIdx !== -1 && args[expiresIdx + 1]) {
+        expires_at = args[expiresIdx + 1];
+      }
+    } else if (args[0] && args[1] === "--to" && args[2]) {
+      issuer = "alice";
+      action = args[0];
+      grantee = args[2];
+      const expiresIdx = args.indexOf("--expires");
+      if (expiresIdx !== -1 && args[expiresIdx + 1]) {
+        expires_at = args[expiresIdx + 1];
+      }
+    } else {
+      console.error("Usage: frame grant <issuer> <action> <grantee> [--expires <ISODate>] OR frame grant <action> --to <recipient> [--expires <ISODate>]");
       Deno.exit(1);
     }
-    await grantCapability("alice", recipient, action, expires_at, useKv);
+    await grantCapability(issuer, grantee, action, expires_at, useKv);
     break;
   }
   case "revoke": {
-    const [action, fromFlag, from] = args;
-    if (!action || fromFlag !== "--from" || !from) {
-      console.error("Usage: frame revoke <action> --from <identity>");
+    let issuer, action, grantee;
+    if (args.length >= 3 && args[1] && args[2] && !args[0].startsWith("--") && !args[1].startsWith("--") && !args[2].startsWith("--")) {
+      [issuer, action, grantee] = args;
+    } else if (args[0] && args[1] === "--from" && args[2]) {
+      issuer = "alice";
+      action = args[0];
+      grantee = args[2];
+    } else {
+      console.error("Usage: frame revoke <issuer> <action> <grantee> OR frame revoke <action> --from <identity>");
       Deno.exit(1);
     }
-    await revokeCapability("alice", from, action, useKv);
+    await revokeCapability(issuer, grantee, action, useKv);
     break;
   }
   case "cap": {
@@ -634,7 +654,7 @@ switch (command) {
       const [agent, condition, action] = args.slice(1);
       if (!agent || !condition || !action) {
         console.error("Usage: frame reflex add <agent> <condition> <action> [--kv]");
-        console.error("Example: frame reflex add alice 'balance < 50' 'mint.self?amount=100'");
+        console.error("Example: frame reflex add alice 'balance < 500' 'mint.self?amount=100'");
         Deno.exit(1);
       }
       const ruleId = await createReflexRule(agent, condition, action, useKv);
@@ -774,56 +794,6 @@ switch (command) {
     }
     break;
   }
-  case "cap": {
-    const subcommand = args[0];
-    if (subcommand === "purge-invalid") {
-      await purgeInvalidCapabilities(useKv);
-    } else if (subcommand === "list") {
-      const { list } = await import("./core/storage.ts");
-      const caps = await list(["cap"]);
-      console.log("📦 All Capabilities:");
-      for (const entry of caps) {
-        const status = entry.value.revoked ? "❌" : "✅";
-        const expires = entry.value.expires_at ? ` (expires: ${entry.value.expires_at})` : "";
-        console.log(`  ${status} ${entry.key.join(" → ")}${expires}`);
-      }
-    } else if (subcommand === "audit") {
-      const { list } = await import("./core/storage.ts");
-      const caps = await list(["cap"]);
-      console.log("🔍 Capability Audit:");
-      let total = 0;
-      let valid = 0;
-      let expired = 0;
-      let revoked = 0;
-      for (const entry of caps) {
-        total++;
-        if (entry.value.revoked) {
-          revoked++;
-        } else if (entry.value.expires_at && new Date(entry.value.expires_at) < new Date()) {
-          expired++;
-        } else {
-          valid++;
-        }
-      }
-      console.log(`  Total capabilities: ${total}`);
-      console.log(`  Valid: ${valid}`);
-      console.log(`  Expired: ${expired}`);
-      console.log(`  Revoked: ${revoked}`);
-      if (expired > 0 || revoked > 0) {
-        console.log("\n  Expired/Revoked capabilities:");
-        for (const entry of caps) {
-          if (entry.value.revoked || (entry.value.expires_at && new Date(entry.value.expires_at) < new Date())) {
-            const status = entry.value.revoked ? "❌ REVOKED" : "⏰ EXPIRED";
-            console.log(`    ${status}: ${entry.key.join(" → ")}`);
-          }
-        }
-      }
-    } else {
-      console.error("Usage: frame cap <purge-invalid|list|audit>");
-      Deno.exit(1);
-    }
-    break;
-  }
   case "repair-identities": {
     console.log("🔄 Repairing identity data...");
     const { repairIdentities } = await import("./core/identity.ts");
@@ -838,27 +808,229 @@ switch (command) {
     console.log("✅ Capability data repair completed");
     break;
   }
+  case "serve": {
+    const port = args[0] ? parseInt(args[0]) : 8080;
+    if (isNaN(port) || port < 1 || port > 65535) {
+      console.error("Usage: frame serve [port]");
+      console.error("Port must be between 1 and 65535");
+      Deno.exit(1);
+    }
+    console.log(`🌐 Starting FRAME web-lite UI on port ${port}...`);
+    console.log(`📱 Open http://localhost:${port} in your browser`);
+    
+    const server = Deno.serve({ port }, async (req) => {
+      const url = new URL(req.url);
+      const path = url.pathname;
+      
+      try {
+        if (path === "/" || path === "/index.html") {
+          const html = await Deno.readTextFile("./web-lite/index.html");
+          return new Response(html, {
+            headers: { "Content-Type": "text/html" }
+          });
+        } else if (path.startsWith("/src/")) {
+          const filePath = `./web-lite${path}`;
+          const content = await Deno.readTextFile(filePath);
+          const contentType = path.endsWith(".js") ? "application/javascript" : 
+                             path.endsWith(".css") ? "text/css" : "text/plain";
+          return new Response(content, {
+            headers: { "Content-Type": contentType }
+          });
+        } else if (path === "/manifest.json") {
+          const manifest = await Deno.readTextFile("./web-lite/manifest.json");
+          return new Response(manifest, {
+            headers: { "Content-Type": "application/json" }
+          });
+        } else if (path === "/serviceWorker.js") {
+          const sw = await Deno.readTextFile("./web-lite/serviceWorker.js");
+          return new Response(sw, {
+            headers: { "Content-Type": "application/javascript" }
+          });
+        } else {
+          return new Response("Not Found", { status: 404 });
+        }
+      } catch (error) {
+        console.error(`Error serving ${path}:`, error);
+        return new Response("Internal Server Error", { status: 500 });
+      }
+    });
+    
+    console.log(`✅ Web-lite UI server started on http://localhost:${port}`);
+    await server.finished;
+    break;
+  }
+  case "send-intent": {
+    const [identity, intentUrl] = args;
+    if (!identity || !intentUrl) {
+      console.error("Usage: frame send-intent <identity> <intent_url> [--kv]");
+      console.error("Example: frame send-intent alice 'pay.gas?amount=25'");
+      Deno.exit(1);
+    }
+    if (!useKv) {
+      console.error("❌ Send-intent command only works with --kv flag");
+      Deno.exit(1);
+    }
+    const intentId = await submitIntent(intentUrl, useKv);
+    console.log(`📤 Intent sent from ${identity}: ${intentId}`);
+    break;
+  }
+  case "caps": {
+    const subcommand = args[0];
+    if (!subcommand) {
+      console.error("Usage: frame caps <identity> [--kv] or frame cap <list|audit|purge-invalid>");
+      Deno.exit(1);
+    }
+    if (["list", "audit", "purge-invalid"].includes(subcommand)) {
+      if (subcommand === "purge-invalid") {
+        await purgeInvalidCapabilities(useKv);
+      } else if (subcommand === "list") {
+        const { list } = await import("./core/storage.ts");
+        const caps = await list(["cap"]);
+        console.log("📦 All Capabilities:");
+        for (const entry of caps) {
+          const status = entry.value.revoked ? "❌" : "✅";
+          const expires = entry.value.expires_at ? ` (expires: ${entry.value.expires_at})` : "";
+          console.log(`  ${status} ${entry.key.join(" → ")}${expires}`);
+        }
+      } else if (subcommand === "audit") {
+        const { list } = await import("./core/storage.ts");
+        const caps = await list(["cap"]);
+        console.log("🔍 Capability Audit:");
+        let total = 0;
+        let valid = 0;
+        let expired = 0;
+        let revoked = 0;
+        for (const entry of caps) {
+          total++;
+          if (entry.value.revoked) {
+            revoked++;
+          } else if (entry.value.expires_at && new Date(entry.value.expires_at) < new Date()) {
+            expired++;
+          } else {
+            valid++;
+          }
+        }
+        console.log(`  Total capabilities: ${total}`);
+        console.log(`  Valid: ${valid}`);
+        console.log(`  Expired: ${expired}`);
+        console.log(`  Revoked: ${revoked}`);
+        if (expired > 0 || revoked > 0) {
+          console.log("\n  Expired/Revoked capabilities:");
+          for (const entry of caps) {
+            if (entry.value.revoked || (entry.value.expires_at && new Date(entry.value.expires_at) < new Date())) {
+              const status = entry.value.revoked ? "❌ REVOKED" : "⏰ EXPIRED";
+              console.log(`    ${status}: ${entry.key.join(" → ")}`);
+            }
+          }
+        }
+      }
+    } else {
+      const identity = subcommand;
+      if (!identity) {
+        console.error("Usage: frame caps <identity> [--kv]");
+        Deno.exit(1);
+      }
+      if (!useKv) {
+        console.error("❌ Caps command only works with --kv flag");
+        Deno.exit(1);
+      }
+      const { list } = await import("./core/storage.ts");
+      const caps = await list(["cap"]);
+      console.log(`📦 Capabilities for ${identity}:`);
+      let found = false;
+      for (const entry of caps) {
+        if (entry.key[1] === identity || entry.key[2] === identity) {
+          found = true;
+          const status = entry.value.revoked ? "❌" : "✅";
+          const expires = entry.value.expires_at ? ` (expires: ${entry.value.expires_at})` : "";
+          console.log(`  ${status} ${entry.key.join(" → ")}${expires}`);
+        }
+      }
+      if (!found) {
+        console.log(`  No capabilities found for ${identity}`);
+      }
+    }
+    break;
+  }
+  case "capabilities": {
+    const subcommand = args[0];
+    if (!subcommand) {
+      console.error("Usage: frame caps <identity> [--kv] or frame cap <list|audit|purge-invalid>");
+      Deno.exit(1);
+    }
+    if (["list", "audit", "purge-invalid"].includes(subcommand)) {
+      if (subcommand === "purge-invalid") {
+        await purgeInvalidCapabilities(useKv);
+      } else if (subcommand === "list") {
+        const { list } = await import("./core/storage.ts");
+        const caps = await list(["cap"]);
+        console.log("📦 All Capabilities:");
+        for (const entry of caps) {
+          const status = entry.value.revoked ? "❌" : "✅";
+          const expires = entry.value.expires_at ? ` (expires: ${entry.value.expires_at})` : "";
+          console.log(`  ${status} ${entry.key.join(" → ")}${expires}`);
+        }
+      } else if (subcommand === "audit") {
+        const { list } = await import("./core/storage.ts");
+        const caps = await list(["cap"]);
+        console.log("🔍 Capability Audit:");
+        let total = 0;
+        let valid = 0;
+        let expired = 0;
+        let revoked = 0;
+        for (const entry of caps) {
+          total++;
+          if (entry.value.revoked) {
+            revoked++;
+          } else if (entry.value.expires_at && new Date(entry.value.expires_at) < new Date()) {
+            expired++;
+          } else {
+            valid++;
+          }
+        }
+        console.log(`  Total capabilities: ${total}`);
+        console.log(`  Valid: ${valid}`);
+        console.log(`  Expired: ${expired}`);
+        console.log(`  Revoked: ${revoked}`);
+        if (expired > 0 || revoked > 0) {
+          console.log("\n  Expired/Revoked capabilities:");
+          for (const entry of caps) {
+            if (entry.value.revoked || (entry.value.expires_at && new Date(entry.value.expires_at) < new Date())) {
+              const status = entry.value.revoked ? "❌ REVOKED" : "⏰ EXPIRED";
+              console.log(`    ${status}: ${entry.key.join(" → ")}`);
+            }
+          }
+        }
+      }
+    } else {
+      const identity = subcommand;
+      if (!identity) {
+        console.error("Usage: frame caps <identity> [--kv]");
+        Deno.exit(1);
+      }
+      if (!useKv) {
+        console.error("❌ Caps command only works with --kv flag");
+        Deno.exit(1);
+      }
+      const { list } = await import("./core/storage.ts");
+      const caps = await list(["cap"]);
+      console.log(`📦 Capabilities for ${identity}:`);
+      let found = false;
+      for (const entry of caps) {
+        if (entry.key[1] === identity || entry.key[2] === identity) {
+          found = true;
+          const status = entry.value.revoked ? "❌" : "✅";
+          const expires = entry.value.expires_at ? ` (expires: ${entry.value.expires_at})` : "";
+          console.log(`  ${status} ${entry.key.join(" → ")}${expires}`);
+        }
+      }
+      if (!found) {
+        console.log(`  No capabilities found for ${identity}`);
+      }
+    }
+    break;
+  }
   default:
-    console.error(`Unknown command: ${command}`);
-    console.log("\nAvailable commands:");
-    console.log("  frame create <name>                    - Create identity");
-    console.log("  frame intent <url> [--exec] [--anchor] - Resolve/execute intent");
-    console.log("  frame grant <action> --to <recipient>  - Grant capability");
-    console.log("  frame trust <from> --trusts <to>       - Set trust relationship");
-    console.log("  frame balance <identity>               - Check token balance");
-    console.log("  frame mint <identity> <amount>         - Mint tokens");
-    console.log("  frame transfer <from> <to> <amount>    - Transfer tokens");
-    console.log("  frame chain <verify|show|wipe>         - Chain operations");
-    console.log("  frame explorer [port]                  - Start web explorer");
-    console.log("  frame agent <identity> [options]       - Run autonomous agent");
-    console.log("  frame reflex <add|list|stats|check>    - Reflex rules");
-    console.log("  frame trust-peer <peer> <score>        - Update peer trust");
-    console.log("  frame peer-stats                       - Show peer statistics");
-    console.log("  frame peers <list|add>                 - List/add peers");
-    console.log("  frame stake <define|grant|unlock>      - Capability staking");
-    console.log("  frame cap <list|audit|purge-invalid>   - Capability management");
-    console.log("  frame repair-identities                - Repair identity data");
-    console.log("  frame repair-caps                      - Repair capability data");
-    console.log("\nAdd --kv flag to use Deno KV storage");
+    printHelp();
     Deno.exit(1);
 }

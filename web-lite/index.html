@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRAME Web Runtime</title>
+  <meta name="description" content="FRAME - A sovereign capability-based runtime for the web">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔲</text></svg>">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            frame: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    body.dark {
+      background: #18181b;
+      color: #f3f4f6;
+    }
+    .app-container {
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    
+    .header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 16px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    body.dark .header {
+      background: #23232b;
+      border-bottom: 1px solid #27272a;
+      color: #f3f4f6;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+    body.dark .header h1 {
+      color: #f3f4f6;
+    }
+    .header p {
+      margin: 4px 0 0 0;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    body.dark .header p {
+      color: #a1a1aa;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+    .panel {
+      display: none;
+    }
+    
+    .panel.active {
+      display: block;
+    }
+    
+    @media (max-width: 640px) {
+      .header h1 {
+        font-size: 20px;
+      }
+      
+      .header p {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <h1>🔲 FRAME</h1>
+      <p>Sovereign Capability-Based Runtime</p>
+      <button id="install-btn" class="btn btn-primary" style="margin-top:8px;display:none;">📱 Install FRAME</button>
+      <button id="dark-toggle" class="btn btn-secondary" style="margin-top:8px;">🌙 Dark Mode</button>
+    </header>
+    
+    <identity-panel class="panel active"></identity-panel>
+    <capability-panel class="panel"></capability-panel>
+    <intent-panel class="panel"></intent-panel>
+    <agent-panel class="panel"></agent-panel>
+    <token-panel class="panel"></token-panel>
+    <trust-panel class="panel"></trust-panel>
+    <staking-panel class="panel"></staking-panel>
+    <chain-panel class="panel"></chain-panel>
+    <console-panel class="panel"></console-panel>
+    
+    <tab-bar></tab-bar>
+  </div>
+  
+  <script type="module">
+    import './src/storage.js';
+    import './src/crypto.js';
+    import frame from './src/frame.js';
+    import './src/ui/IdentityPanel.js';
+    import './src/ui/CapabilityPanel.js';
+    import './src/ui/IntentPanel.js';
+    import './src/ui/AgentPanel.js';
+    import './src/ui/TokenPanel.js';
+    import './src/ui/TrustPanel.js';
+    import './src/ui/StakingPanel.js';
+    import './src/ui/ChainPanel.js';
+    import './src/ui/ConsolePanel.js';
+    import './src/ui/TabBar.js';
+    
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('🔲 FRAME Web Runtime initialized');
+      
+      // Set up console logging
+      frame.onLog((logEntry) => {
+        const consolePanel = document.querySelector('console-panel');
+        if (consolePanel && consolePanel.addLog) {
+          consolePanel.addLog(logEntry);
+        }
+      });
+      
+      // Log initial status
+      frame.log('🔲 FRAME Web Runtime ready', 'info');
+      
+      // Check for service worker support
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.register('serviceWorker.js');
+          console.log('Service Worker registered:', registration);
+          frame.log('📱 PWA support enabled', 'success');
+        } catch (error) {
+          console.log('Service Worker registration failed:', error);
+          frame.log('⚠️ PWA support unavailable', 'warning');
+        }
+      }
+    });
+    
+    // Handle install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-btn').style.display = 'inline-block';
+      frame.log('📱 App can be installed', 'info');
+    });
+    
+    document.getElementById('install-btn').addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        frame.log(`Install prompt outcome: ${outcome}`);
+        deferredPrompt = null;
+        document.getElementById('install-btn').style.display = 'none';
+      }
+    });
+    
+    // Dark mode toggle
+    const darkToggle = document.getElementById('dark-toggle');
+    darkToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      if (document.body.classList.contains('dark')) {
+        darkToggle.textContent = '☀️ Light Mode';
+      } else {
+        darkToggle.textContent = '🌙 Dark Mode';
+      }
+    });
+  </script>
+</body>
+</html> 

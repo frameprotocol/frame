@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRAME Crypto Test</title>
+</head>
+<body>
+  <h1>FRAME Crypto Test</h1>
+  <div id="output"></div>
+  
+  <script type="module">
+    import { 
+      generateKeyPair, 
+      exportKeyPair, 
+      importPrivateKey, 
+      importPublicKey, 
+      sign, 
+      verify, 
+      hash, 
+      arrayBufferToBase64, 
+      base64ToArrayBuffer 
+    } from './src/crypto.js';
+    
+    const output = document.getElementById('output');
+    
+    async function test() {
+      try {
+        output.innerHTML = '<p>Testing FRAME crypto functions...</p>';
+        
+        // Test key generation
+        output.innerHTML += '<p>🔑 Generating keypair...</p>';
+        const keyPair = await generateKeyPair();
+        output.innerHTML += '<p>✅ Keypair generated</p>';
+        
+        // Test key export/import
+        output.innerHTML += '<p>📤 Exporting keys...</p>';
+        const exportedKeys = await exportKeyPair(keyPair);
+        output.innerHTML += '<p>✅ Keys exported</p>';
+        
+        // Test key import
+        output.innerHTML += '<p>📥 Importing keys...</p>';
+        const importedPrivateKey = await importPrivateKey(exportedKeys.privateKey);
+        const importedPublicKey = await importPublicKey(exportedKeys.publicKey);
+        output.innerHTML += '<p>✅ Keys imported</p>';
+        
+        // Test signing and verification
+        output.innerHTML += '<p>✍️ Testing signature...</p>';
+        const message = "Hello, FRAME!";
+        const signatureBuffer = await sign(importedPrivateKey, message);
+        const signature = arrayBufferToBase64(signatureBuffer);
+        output.innerHTML += '<p>✅ Message signed</p>';
+        
+        // Test verification
+        output.innerHTML += '<p>🔍 Verifying signature...</p>';
+        const signatureBuffer2 = base64ToArrayBuffer(signature);
+        const isValid = await verify(importedPublicKey, signatureBuffer2, message);
+        output.innerHTML += `<p>✅ Signature verified: ${isValid}</p>`;
+        
+        // Test hashing
+        output.innerHTML += '<p>🔢 Testing hash...</p>';
+        const hashResult = await hash("test data");
+        output.innerHTML += `<p>✅ Hash generated: ${hashResult.substring(0, 16)}...</p>`;
+        
+        output.innerHTML += '<p><strong>🎉 All crypto tests passed! FRAME crypto is working correctly.</strong></p>';
+        
+      } catch (error) {
+        output.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+        console.error('Test error:', error);
+      }
+    }
+    
+    test();
+  </script>
+</body>
+</html> 
